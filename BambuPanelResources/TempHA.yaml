@@ -1,0 +1,39 @@
+esphome:
+
+substitutions:
+  
+  PrinterEncTemp: "sensor.cabinclimate_temperature"
+  PrinterEncRH: "sensor.cabinclimate_humidity"
+
+number: 
+  - platform: homeassistant
+    id: printer_enc_temp
+    entity_id: ${PrinterEncTemp}
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: LabelEncTemp
+            text:
+              format: "%.0f°C"
+              args: [ 'x' ]
+        - lvgl.label.update:
+            id: LabelControl1EncTemp
+            text:
+              format: "%.0f°C"
+              args: [ 'x' ]
+  - platform: homeassistant
+    id: printer_enc_RH
+    entity_id: ${PrinterEncRH}
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: LabelEncRH
+            text:
+              format: "%.0f%%"
+              args: [ 'x' ] 
+        - lvgl.label.update:
+        
+            id: LabelControl1EncRH
+            text:
+              format: "%.0f%%"
+              args: [ 'x' ] 

@@ -1,0 +1,290 @@
+# Most items here are specific to the panel itself or not supported on SDL2 Host
+ 
+packages:
+  # An external package that defines the external enclosure temperature and humity customise to your needs or comment out if not needed.
+  Temperature: !include BambuPanelResources/TempHA.yaml
+  # All the main settings
+  Common: !include BambuPanelResources/common.yaml
+
+esphome:
+  name: bambupanel
+  friendly_name: BambuPanel
+  platformio_options:
+#    build_flags: "-DBOARD_HAS_PSRAM"
+#    board_build.arduino.memory_type: qio_opi
+    board_build.flash_mode: dio
+#    board_upload.maximum_ram_size: 524288
+# Set initial Wi-Fi strength image
+  on_boot:
+    then:
+      - if:
+          condition:
+            lambda: 'return id(printer_wifi).state == 0.0;'
+          then:
+            - lvgl.image.update:
+                id: ButtonWiFi
+                src: ImageNavWiFiNone
+      - if:
+          condition:
+            lambda: 'return id(printer_wifi).state >= -80.0;'
+          then:
+            - lvgl.image.update:
+                id: ButtonWiFi
+                src: ImageNavWiFiWeak 
+      - if:
+          condition:
+            lambda: 'return id(printer_wifi).state >= -70.0;'
+          then:
+            - lvgl.image.update:
+                id: ButtonWiFi
+                src: ImageNavWiFiMiddle
+      - if:
+          condition:
+            lambda: 'return id(printer_wifi).state >= -60.0;'
+          then:
+            - lvgl.image.update:
+                id: ButtonWiFi
+                src: ImageNavWiFiStrong
+      
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 8MB
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: y
+      CONFIG_ESP32S3_DATA_CACHE_64KB: y
+      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: y
+      CONFIG_SPIRAM_RODATA: y
+
+# Enable Home Assistant API
+api:
+
+ota:
+  - password: "add_one"
+    platform: esphome
+    on_begin:
+      then:
+        - lvgl.pause
+        - switch.turn_off: Backlight
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  on_connect:
+    - component.update: ImageCover
+
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+# Enable logging
+logger:
+  level: DEBUG
+  hardware_uart: uart1
+
+i2c:
+  sda: GPIO08
+  scl: GPIO09
+  scan: True
+  id: bus_a
+  frequency: 400khz
+
+
+# uart:
+#  - id: uart_1
+#    tx_pin: GPIO43
+#    rx_pin: GPIO44
+#    baud_rate: 9600
+
+# RS485
+#  - id: uart_rs485
+#    tx_pin: GPIO16 # note docs wrong
+#    rx_pin: GPIO15
+#    baud_rate: 9600
+#    data_bits: 8
+#    stop_bits: 1
+#    parity: NONE
+#    debug: 
+
+# Note RS485 adaptor RX-RX, TX-TX on ESP end
+
+#mlinkRELAY:
+#  id: testRELAY
+#  address: 0x52
+
+#mlinkRGBW:
+#  id: testRGBW
+#  address: 0x53
+
+#output:
+#  - platform: mlinkRGBW
+#    id: mlinkRGBW_R
+#    mlinkRGBW_id: testRGBW
+#    channel: 0
+#  - platform: mlinkRGBW
+#    id: mlinkRGBW_G
+#    mlinkRGBW_id: testRGBW
+#    channel: 1
+#  - platform: mlinkRGBW
+#    id: mlinkRGBW_B
+#    mlinkRGBW_id: testRGBW
+#    channel: 2
+#  - platform: mlinkRGBW
+#    id: mlinkRGBW_W
+#    mlinkRGBW_id: testRGBW
+#    channel: 3
+
+#light:
+#  - platform: rgbw
+#    name: "Test Light"
+#    red: mlinkRGBW_R
+#    green: mlinkRGBW_G
+#    blue: mlinkRGBW_B
+#    white: mlinkRGBW_W
+#    color_interlock: True
+
+# IO Expander
+ch422g:
+  - id: ch422g_hub
+
+
+switch:
+  - platform: gpio
+    name: Backlight
+    id: Backlight
+    pin:
+      ch422g: ch422g_hub
+      number: 2
+      mode:
+        output: true
+      inverted: false
+    restore_mode: ALWAYS_ON
+
+  - platform: gpio
+    name: LCD_RST
+    pin:
+      ch422g: ch422g_hub
+      number: 3
+      mode:
+        output: true
+      inverted: false
+    restore_mode: ALWAYS_ON
+
+  - platform: template
+    id: display_enabled
+    optimistic: true
+    restore_mode: ALWAYS_ON
+
+#  - platform: mlinkRELAY
+#    id: mlinkChannel0
+#    name: Relay0
+#    channel: 0
+#  - platform: mlinkRELAY
+#    id: mlinkChannel1
+#    name: Relay1
+#    channel: 1
+#  - platform: mlinkRELAY
+#    id: mlinkChannel2
+#    name: Relay2
+#    channel: 2
+#  - platform: mlinkRELAY
+#    id: mlinkChannel3
+#    name: Relay3
+#    channel: 3
+    
+
+
+
+
+
+
+display:
+  - platform: rpi_dpi_rgb
+    id: my_display
+    update_interval: never
+    auto_clear_enabled: false
+    color_order: RGB
+    pclk_frequency: 16MHz
+    dimensions:
+      width: 800
+      height: 480
+    reset_pin:
+      ch422g:
+      number: 3
+    enable_pin:
+      ch422g:
+      number: 2
+    de_pin:
+      number: 5
+    hsync_pin:
+      number: 46
+      ignore_strapping_warning: true
+    vsync_pin:
+      number: 3
+      ignore_strapping_warning: true
+    pclk_pin: 7
+    # Display settings for 7" screen
+    hsync_back_porch: 8
+    hsync_front_porch: 8
+    hsync_pulse_width: 4
+    vsync_back_porch: 16
+    vsync_front_porch: 16
+    vsync_pulse_width: 4
+    # Display settings for 4.3" screen
+    #hsync_back_porch: 30
+    #hsync_front_porch: 210
+    #hsync_pulse_width: 30
+    #vsync_back_porch: 4
+    #vsync_front_porch: 4
+    #vsync_pulse_width: 4
+    data_pins:
+      red: [1, 2, 42, 41, 40]
+      blue: [14, 38, 18, 17, 10]
+      green: [39, 0, 45, 48, 47, 21]
+
+
+touchscreen:
+  platform: gt911
+  id: my_touch
+  interrupt_pin: GPIO4
+  reset_pin:
+    ch422g: ch422g_hub
+    number: 1 #edit: It's on IO1
+    mode: OUTPUT
+
+  on_release:
+    - if:
+        condition: lvgl.is_paused
+        then:
+          - logger.log: "LVGL resuming"
+          - lvgl.resume:
+          - lvgl.widget.redraw:
+          - switch.turn_on: Backlight
+
+
+
+
+sensor:
+  - platform: uptime
+    name: "Uptime Sensor"
+    id: uptime_sensor
+    entity_category: diagnostic
+    internal: False
+
+  - platform: wifi_signal
+    name: "WiFi Signal dB"
+    id: wifi_signal_db
+    update_interval: 60s
+    entity_category: "diagnostic"
+
+  - platform: copy
+    source_id: wifi_signal_db
+    name: "WiFi Signal Percent"
+    filters:
+      - lambda: return min(max(2 * (x + 100.0), 0.0), 100.0);
+    unit_of_measurement: "Signal %"
+    entity_category: "diagnostic"
+    device_class: ""

@@ -1,0 +1,2454 @@
+
+esphome:
+
+
+substitutions:
+ # Printer ***** change me ******
+  PrinterEntity: "p1s_changeme"
+  # Colors
+  BackGroundColor: "0x212121"
+  BambuGreen: "0x01af40"
+  BambuLtGrey: "0xaeaeae"
+  BambuBorder: "0x3b3b39"
+  BambuHeader: "0x303030"
+  BambuInfo: "0x404541"
+  BambuBackground: "0x424441"
+  BambuWhiteText: "0xf5f5f5"
+  BambuGreyText: "0x969895"
+  # Sensors
+  PrinterLight: "light.${PrinterEntity}_chamber_light"
+  PrinterWiFi: "sensor.${PrinterEntity}_wi_fi_signal"
+  PrinterStatus: "sensor.${PrinterEntity}_print_status"
+  PrinterCurrentStage: "sensor.${PrinterEntity}_current_stage"
+  PrinterNozzleTemp: "sensor.${PrinterEntity}_nozzle_temperature"
+  PrinterNozzleTargetTemp: "sensor.${PrinterEntity}_nozzle_target_temperature"
+  PrinterBedTemp: "sensor.${PrinterEntity}_bed_temperature"
+  PrinterBedTargetTemp: "sensor.${PrinterEntity}_bed_target_temperature"
+  PrinterName: "sensor.${PrinterEntity}_printer_name"
+  PrinterIP: "sensor.${PrinterEntity}_ip_address"
+  # The A1/P1 series don't have enclosure temp or humidy sensors, but you can use another sensor e.g. Zigbee, to do so specify Hidden as false.
+  # If you don't have a temperature and or humidity sensor specify hidden as TRUE 
+  PrinterEncTempHidden: "FALSE"
+  PrinterEncRHHidden: "FALSE"
+  PrinterPrintProgress: "sensor.${PrinterEntity}_print_progress"
+  PrinterTaskName: "sensor.${PrinterEntity}_task_name"
+  PrinterPrintEndTime: "sensor.${PrinterEntity}_end_time"
+  PrinterSpeedProfile: "sensor.${PrinterEntity}_speed_profile" # Sensor
+  PrinterSpeedSetting: "select.${PrinterEntity}_printing_speed" # speed selector
+  PrinterCurrentLayer: "sensor.${PrinterEntity}_current_layer"
+  PrinterTotalLayer: "sensor.${PrinterEntity}_total_layer_count"
+  # Cover URL
+  PrinterCoverImageURL: "http://homeassistant.local:8123/local/media/bambuprinter/cover.png"
+# Printer status value 
+  PrinterStateValunknown: "0"
+  PrinterStateValoffline: "1"
+  PrinterStateValidle: "2"
+  PrinterStateValfinish: "3"
+  PrinterStateValfailed: "4"
+  PrinterStateValprepare: "5"
+  PrinterStateValslicing: "6"
+  PrinterStateValinit: "7"
+  PrinterStateValrunning: "8"
+  PrinterStateValpause: "9"
+
+  # Fans
+  PrinterFanEnclosure: "sensor.${PrinterEntity}_chamber_fan_speed"
+  PrinterFanCooling: "sensor.${PrinterEntity}_cooling_fan_speed"
+  PrinterFanAux: "sensor.${PrinterEntity}_aux_fan_speed"
+  PrinterFanHeatBreak: "sensor.${PrinterEntity}_heatbreak_fan_speed" # Not sure if used
+  PrinterFanEnclosureControl: "fan.${PrinterEntity}_chamber_fan"
+  PrinterFanAuxControl: "fan.${PrinterEntity}_aux_fan"
+  PrinterFanCoolingControl: "fan.${PrinterEntity}_cooling_fan"
+  FanStepSize: "10"
+  
+  # Language replacements, customise labels for your language
+  LangOff: "OFF"
+  LangPrinterName: "Printer Name"
+  LangPrinterStatus: "Printer Status"
+  LangIPAddress: "IP Address"
+  LangWaiting: "Waiting..."
+  LangPrintProgress: "Print Progress"
+  LangPrintTaskName: "Print Job"
+  LangPrintEndTime: "Estimated completion"
+  LangTempAxis: "Temperature/Axis"
+  LangFilament: "Filament"
+  LangUtilities: "Utilities"
+  LangPrintOptions: "Print Options"
+  LangFanEnc: "Chamber"
+  LangFanCooling: "Part"
+  LangFanAux: "Aux"
+  LangSpeedSilent: "Silent"
+  LangSpeedStandard: "Standard"
+  LangSpeedSport: "Sport"
+  LangSpeedLudicrous: "Ludicrous"
+  LangSpeedHeading: "Printer Speed"
+  LangMsgBoxSpeed: "Speed can only be changed whilst running"
+  LangLayer: "Layer - "
+  LangCancel: "Cancel"
+  LangNozzleHeading: "Nozzle temperature"
+  LangMsgBoxNozzle: "Set Nozzle temperature to "
+
+globals:
+  - id: PrinterStateOnline
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: TemperatureTemp
+    type: std::string
+    restore_value: false
+    initial_value: '"890"'
+
+font:
+  - file: "gfonts://Roboto"
+    id: font_14
+    size: 14
+  - file: "gfonts://Roboto"
+    id: font_18
+    size: 18
+  - file: "gfonts://Roboto"
+    id: font_24
+    size: 24
+  - file: "gfonts://Roboto"
+    id: font_48
+    size: 48
+
+# Needed for online image support note experimental support in SDL2 host needs pr#8040
+http_request:
+
+online_image:
+  - url: ${PrinterCoverImageURL}
+    format: png
+    id: ImageCover
+    type: RGB565
+    transparency: chroma_key
+    resize: 180x180
+    on_download_finished:
+      - lvgl.image.update:
+          id: ImageCoverWidget
+          src: ImageCover
+image:
+  # Left Nav bar images
+  - file: "BambuPanelResources/NavHomeGrn.png"
+    id: ImageNavHomeGrn
+    type: RGB565
+    transparency: chroma_key
+  - file: "BambuPanelResources/NavHomeGrey.png"
+    id: ImageNavHomeGrey
+    type: RGB565
+    transparency: chroma_key
+  - file: "BambuPanelResources/NavSetGrn.png"
+    id: ImageNavSetGrn
+    type: RGB565
+    transparency: chroma_key
+  - file: "BambuPanelResources/NavSetGrey.png"
+    id: ImageNavSetGrey
+    type: RGB565
+    transparency: chroma_key
+  - file: "BambuPanelResources/NavFolderGrn.png"
+    id: ImageNavFolderGrn
+    type: RGB565
+    transparency: chroma_key
+  - file: "BambuPanelResources/NavFolderGrey.png"
+    id: ImageNavFolderGrey
+    type: RGB565
+    transparency: chroma_key
+  - file: "BambuPanelResources/NavMaintGrn.png"
+    id: ImageNavMaintGrn
+    type: RGB565
+    transparency: chroma_key
+  - file: "BambuPanelResources/NavMaintGrey.png"
+    id: ImageNavMaintGrey
+    type: RGB565
+    transparency: chroma_key
+  - file: "BambuPanelResources/NavMessGrn.png"
+    id: ImageNavMessGrn
+    type: RGB565
+    transparency: chroma_key
+  - file: "BambuPanelResources/NavMessGrey.png"
+    id: ImageNavMessGrey
+    type: RGB565
+    transparency: chroma_key
+  # Home screen printer image
+  - file: "BambuPanelResources/BambuP1S.png"
+    id: ImagePrinter
+    type: RGB565
+    transparency: alpha_channel #chroma_key
+  # Lamp Icons
+  - file: https://raw.githubusercontent.com/bambulab/BambuStudio/master/resources/images/monitor_lamp_on.svg
+    id: ImageLampOn
+    type: RGB565
+    transparency: chroma_key
+    resize: 40x40
+  - file: https://raw.githubusercontent.com/bambulab/BambuStudio/master/resources/images/monitor_lamp_off.svg
+    id: ImageLampOff
+    type: RGB565
+    transparency: chroma_key
+    resize: 40x40
+  # Wi-Fi Signal
+  - file: https://raw.githubusercontent.com/bambulab/BambuStudio/master/resources/images/monitor_signal_no.svg
+    id: ImageNavWiFiNone
+    type: RGB565
+    transparency: chroma_key
+    resize: 40x40
+  - file: https://raw.githubusercontent.com/bambulab/BambuStudio/master/resources/images/monitor_signal_weak.svg
+    id: ImageNavWiFiWeak
+    type: RGB565
+    transparency: chroma_key
+    resize: 40x40
+  - file: https://raw.githubusercontent.com/bambulab/BambuStudio/master/resources/images/monitor_signal_middle.svg
+    id: ImageNavWiFiMiddle
+    type: RGB565
+    transparency: chroma_key
+    resize: 40x40
+  - file: https://raw.githubusercontent.com/bambulab/BambuStudio/master/resources/images/monitor_signal_strong.svg
+    id: ImageNavWiFiStrong
+    type: RGB565
+    transparency: chroma_key
+    resize: 40x40
+  # Temperatures
+  - file: https://raw.githubusercontent.com/bambulab/BambuStudio/master/resources/images/monitor_nozzle_temp.svg
+    id: ImageNavNozzleTemp
+    type: RGB565
+    transparency: chroma_key
+    resize: 40x40
+  - file: https://raw.githubusercontent.com/bambulab/BambuStudio/master/resources/images/monitor_nozzle_temp_active.svg
+    id: ImageNavNozzleTempActive
+    type: RGB565
+    transparency: chroma_key
+    resize: 40x40
+  - file: https://raw.githubusercontent.com/bambulab/BambuStudio/master/resources/images/monitor_bed_temp.svg
+    id: ImageNavBedTemp
+    type: RGB565
+    transparency: chroma_key
+    resize: 40x40
+  - file: https://raw.githubusercontent.com/bambulab/BambuStudio/master/resources/images/monitor_bed_temp_active.svg
+    id: ImageNavBedTempActive
+    type: RGB565
+    transparency: chroma_key
+    resize: 40x40
+  - file: https://raw.githubusercontent.com/bambulab/BambuStudio/master/resources/images/monitor_frame_temp.svg
+    id: ImageNavEncTemp
+    type: RGB565
+    transparency: chroma_key
+    resize: 40x40
+  - file: https://raw.githubusercontent.com/bambulab/BambuStudio/master/resources/images/monitor_frame_temp_active.svg
+    id: ImageNavEncTempActive
+    type: RGB565
+    transparency: chroma_key
+    resize: 40x40
+  # Speeds
+  - file: https://raw.githubusercontent.com/bambulab/BambuStudio/master/resources/images/monitor_speed.svg
+    id: ImageNavSpeed
+    type: RGB565
+    transparency: chroma_key
+    resize: 40x40
+  - file: https://raw.githubusercontent.com/bambulab/BambuStudio/master/resources/images/monitor_speed_active.svg
+    id: ImageNavSpeedActive
+    type: RGB565
+    transparency: chroma_key
+    resize: 40x40  
+  # Fans
+  - file: https://raw.githubusercontent.com/bambulab/BambuStudio/master/resources/images/monitor_fan_off.svg
+    id: ImageNavFanOff
+    type: RGB565
+    transparency: chroma_key
+    resize: 40x40
+  - file: https://raw.githubusercontent.com/bambulab/BambuStudio/master/resources/images/monitor_fan_on.svg
+    id: ImageNavFanOn
+    type: RGB565
+    transparency: chroma_key
+    resize: 40x40
+  # Bed needs to be local as online image too small and won't size up.
+  - file: "BambuPanelResources/bed_pei.png"
+    id: ImageBed
+    type: RGB565
+    transparency: chroma_key
+    resize: 200x200
+
+lvgl:
+  displays:
+    - my_display
+  buffer_size: 26%
+  touchscreens:
+    touchscreen_id: my_touch
+  on_idle:
+    - timeout: 60s
+      then:
+        - script.execute: tidy_PopUpAll
+        - script.execute: show_page_home_script
+    #- timeout: 60s
+    #  then:
+    #    - switch.turn_off: Backlight
+    #    - lvgl.pause:
+                # Message box speed notify
+
+  msgboxes:
+      - id: message_box_speed
+        close_button: true
+        title: ${LangSpeedHeading}
+        body:
+          text: ${LangMsgBoxSpeed}
+          bg_color: 0x808080
+        buttons:
+        
+          - id: msgbox_close_speed
+            text: "\uF00D"
+            on_click:
+              then:
+                - lvgl.widget.hide: message_box_speed
+
+      - id: message_box_nozzle_temp
+        close_button: true
+        title: ${LangNozzleHeading}
+        body:
+          #text: ${LangMsgBoxNozzle}
+          text: !lambda return ("${LangMsgBoxNozzle}" + id(TemperatureTemp));
+          # id(KeyCollNozzle).state.c_str()
+          bg_color: 0x808080
+        buttons:
+          - id: msgbox_apply_nozzle
+            text: "Apply"
+          - id: msgbox_close_nozzle
+            text: "\uF00D"
+            on_click:
+              then:
+                - lvgl.widget.hide: message_box_nozzle_temp
+
+  top_layer:
+    widgets:
+      - obj:
+          x: 0
+          y: 0
+          width: 85
+          height: 96
+          styles: side_bar
+          widgets:
+            - image:
+                align: CENTER
+                src: ImageNavHomeGrn
+                id: ButtonHome
+                on_click:
+                  then:
+                    - script.execute: show_page_home_script
+      - obj:
+          x: 0
+          y: 96
+          width: 85
+          height: 98
+          styles: side_bar
+          widgets:
+            - image:
+                align: CENTER
+                src: ImageNavSetGrey
+                id: ButtonControl
+                on_click:
+                  then:
+                    - script.execute: show_page_control_script
+
+      - obj:
+          x: 0
+          y: 194
+          width: 85
+          height: 98
+          styles: side_bar
+          widgets:
+            - image:
+                align: CENTER
+                src: ImageNavFolderGrey
+                id: ButtonFolder
+
+      - obj:
+          x: 0
+          y: 292
+          width: 85
+          height: 98
+          styles: side_bar
+          widgets:
+            - image:
+                align: CENTER
+                src: ImageNavMaintGrey
+                id: ButtonMaintenance
+      - obj:
+          x: 0
+          y: 390
+          width: 85
+          height: 90
+          styles: side_bar
+          widgets:
+            - image:
+                align: CENTER
+                src: ImageNavMessGrey
+                id: ButtonMessages                                
+  pages:
+  #############################################
+  ##### Home Information Page             #####
+  #############################################
+
+    - id: home_page
+      bg_color: ${BambuBorder}
+      widgets:
+        - obj:
+            # Main panel
+            height: 460
+            width: 598
+            x: 96
+            y: 10
+            scrollbar_mode: "OFF"
+            scrollable: False
+            align: TOP_LEFT
+            bg_color: ${BambuBackground}
+            border_width: 0
+            radius: 10
+            widgets:
+              - image:
+                  align: TOP_LEFT
+                  x: 400 #was 320
+                  y: 100
+                  src: ImagePrinter
+                  id: ButtonImagePrinter
+              - obj:
+                  # Image cover hidden until running bed image overlayed with cover image
+                  align: TOP_LEFT
+                  id: ImageCoverObj
+                  x: 190
+                  y: 40
+                  width: 200
+                  height: 200
+                  pad_all: 0
+                  bg_opa: TRANSP
+                  border_width: 0
+                  hidden: TRUE
+                  scrollbar_mode: "OFF"
+                  widgets:
+                    - image:
+                        align: CENTER
+                        border_width: 0
+                        src: ImageBed
+                    - image:
+                        align: CENTER
+                        border_width: 0
+                        src: ImageCover
+                        id: ImageCoverWidget
+
+              - label:
+                  align: TOP_LEFT
+                  x: 10
+                  y: 50
+                  text_font: font_24
+                  text_color: ${BambuGreyText}
+                  text: ${LangPrinterName}
+              - label:
+                  align: TOP_LEFT
+                  x: 10
+                  y: 85
+                  text_font: font_18
+                  text_color: ${BambuWhiteText}
+                  text: ${LangWaiting}
+                  id: LabelPrinterName
+              - label:
+                  align: TOP_LEFT
+                  x: 10
+                  y: 115
+                  text_font: font_24
+                  text_color: ${BambuGreyText}
+                  text: ${LangIPAddress}
+              - label:
+                  align: TOP_LEFT
+                  x: 10
+                  y: 150
+                  text_font: font_18
+                  text_color: ${BambuWhiteText}
+                  text: ${LangWaiting}
+                  id: LabelPrinterIP  
+              - label:
+                  align: TOP_LEFT
+                  x: 10
+                  y: 180
+                  text_font: font_24
+                  text_color: ${BambuGreyText}
+                  text: ${LangPrinterStatus}
+              - label:
+                  align: TOP_LEFT
+                  x: 10
+                  y: 215
+                  text_font: font_18
+                  text_color: ${BambuWhiteText}
+                  text: ${LangWaiting}
+                  id: LabelPrinterStatus
+# Only shown during printing
+              - label:
+                  align: TOP_LEFT
+                  x: 10
+                  y: 245
+                  text_font: font_24
+                  text_color: ${BambuGreyText}
+                  text: ${LangPrintTaskName}
+                  id: LabelPrintTaskNameText
+                  hidden: TRUE
+              - label:
+                  align: TOP_LEFT
+                  x: 10
+                  y: 280
+                  text_font: font_18
+                  text_color: ${BambuWhiteText}
+                  text: ${LangWaiting}
+                  id: LabelPrintTaskName
+                  hidden: TRUE 
+              - label:
+                  align: TOP_LEFT
+                  x: 10
+                  y: 310
+                  text_font: font_24
+                  text_color: ${BambuGreyText}
+                  text: ${LangPrintEndTime}
+                  id: LabelPrintEndTimeText
+                  hidden: TRUE
+              - label:
+                  align: TOP_LEFT
+                  x: 10
+                  y: 345
+                  text_font: font_18
+                  text_color: ${BambuWhiteText}
+                  text: ${LangWaiting}
+                  id: LabelPrintEndTime
+                  hidden: TRUE
+              - label:
+                  align: TOP_LEFT
+                  x: 10
+                  y: 370
+                  text_font: font_24
+                  text_color: ${BambuGreyText}
+                  text: ${LangPrintProgress}
+                  id: LabelPrintProgressText
+                  hidden: TRUE
+              - label:
+                  align: TOP_LEFT
+                  x: 200
+                  y: 376
+                  text_font: font_18
+                  text_color: ${BambuWhiteText}
+                  text: ${LangLayer}
+                  id: LabelCurrentLayer
+                  hidden: TRUE
+              - bar:
+                  x: 10
+                  y: 410
+                  width: 500
+                  id: BarPrintProgress
+                  value: 0
+                  min_value: 1
+                  max_value: 100
+                  hidden: TRUE
+                  bg_color: ${BambuGreyText}
+                  indicator:
+                    bg_color: ${BambuGreen}
+              - label:
+                  align: TOP_LEFT
+                  id: LabelPrintProgress
+                  x: 515
+                  y: 400
+                  text_font: font_24
+                  text_color: ${BambuGreyText}
+                  text: "0%"
+                  hidden: TRUE
+
+              
+              
+        - obj:
+            # Light Panel
+            height: 86
+            width: 86
+            x: 704
+            y: 10
+            scrollbar_mode: "OFF"
+            scrollable: False
+            align: TOP_LEFT
+            bg_color: ${BambuBackground}
+            border_width: 0
+            radius: 10
+            #ImageLampOff
+            widgets:
+              - image:
+                  align: CENTER
+                  src: ImageLampOff
+                  id: ButtonLampToggle
+                  on_click:
+                    then:
+                      if:
+                        condition:
+                          lambda: 'return id(PrinterStateOnline) >= ${PrinterStateValidle};'
+                        then:
+                          - homeassistant.action:
+                              action: light.toggle
+                              data:
+                                entity_id: ${PrinterLight}
+
+        - obj:
+            # Status Panel
+            height: 364
+            width: 86
+            x: 704
+            y: 106
+            scrollbar_mode: "OFF"
+            scrollable: False
+            align: TOP_LEFT
+            bg_color: ${BambuBackground}
+            border_width: 0
+            radius: 10
+            widgets:
+              - image:
+                  align: TOP_MID
+                  y: 0
+                  src: ImageNavWiFiWeak
+                  id: ButtonWiFi
+              - label:
+                  align: TOP_MID
+                  y: 40
+                  text_font: font_18
+                  text_color: ${BambuWhiteText}
+                  text: ${LangOff}
+                  id: LabelWiFi
+              - image:
+                  align: TOP_MID
+                  y: 80 #was 90
+                  src: ImageNavNozzleTemp
+                  id: ButtonNozzleTemp
+              - label:
+                  align: TOP_MID
+                  y: 125 #was 135
+                  text_font: font_24
+                  text_color: ${BambuWhiteText}
+                  text: ${LangOff}
+                  id: LabelNozzleTemp
+              - image:
+                  align: TOP_MID
+                  y: 165 #was 180
+                  src: ImageNavBedTemp
+                  id: ButtonBedTemp
+              - label:
+                  align: TOP_MID
+                  y: 210 #was 225
+                  text_font: font_24
+                  text_color: ${BambuWhiteText}
+                  text: ${LangOff}
+                  id: LabelBedTemp
+              - image:
+                  align: TOP_MID
+                  y: 250 #was 270
+                  src: ImageNavEncTemp
+                  id: ButtonEncTemp
+                  hidden: ${PrinterEncTempHidden}
+              - label:
+                  align: TOP_MID
+                  y: 295 #was 315
+                  text_font: font_24
+                  text_color: ${BambuWhiteText}
+                  text: ${LangOff}
+                  id: LabelEncTemp
+                  hidden: ${PrinterEncTempHidden}
+              - label:
+                  align: TOP_MID
+                  y: 320 #was 315
+                  text_font: font_24
+                  text_color: ${BambuWhiteText}
+                  text: ${LangOff}
+                  id: LabelEncRH
+                  hidden: ${PrinterEncRHHidden}
+  #############################################
+  #####         Controls Page             #####
+  #############################################
+
+    - id: control_page1
+      bg_color: ${BambuBorder}
+      scrollbar_mode: "OFF"
+      scrollable: FALSE
+      widgets: 
+        # Top tab bar
+        - obj:
+            x: 0
+            y: 0
+            width: 800
+            height: 26
+            radius: 0
+            bg_color: ${BambuHeader}
+            align: TOP_LEFT
+            border_width: 0
+            scrollbar_mode: "OFF"
+        #Top tab bar lighter colour
+        - obj:
+            x: 0
+            y: 26
+            width: 790
+            height: 26
+            radius: 0
+            bg_color: ${BambuBorder}
+            align: TOP_LEFT
+            border_width: 0
+        # Left tab rounding button
+        - obj:
+            x: 0
+            y: 0
+            width: 118
+            height: 52
+            radius: 10
+            bg_color: ${BambuHeader}
+            align: TOP_LEFT
+            border_width: 0
+        # Temp/AxisTab
+        - obj:
+            x: 118
+            y: 7
+            width: 189
+            height: 62
+            radius: 10
+            bg_color: ${BambuBorder}
+            align: TOP_LEFT
+            border_width: 0
+            scrollbar_mode: "OFF"
+            widgets:
+              - label:
+                  align: CENTER
+                  y: -5  
+                  text_font: font_18
+                  text_color: ${BambuWhiteText}
+                  text: ${LangTempAxis}
+        # Right tab rounding button  
+        - obj:
+            x: 307
+            y: 0
+            width: 493
+            height: 52
+            radius: 10
+            bg_color: ${BambuHeader}
+            align: TOP_LEFT
+            border_width: 0
+        # Filament Tab
+        - obj:
+            x: 307
+            y: 7
+            width: 132
+            height: 45
+            radius: 10
+            bg_color: ${BambuHeader}
+            align: TOP_LEFT
+            border_width: 0
+            scrollbar_mode: "OFF"
+            widgets:
+              - label:
+                  align: CENTER  
+                  text_font: font_18
+                  text_color: ${BambuWhiteText}
+                  text: ${LangFilament}
+                  bg_opa: TRANSP          
+        # Utilities Tab
+        - obj:
+            x: 440
+            y: 7
+            width: 121
+            height: 45
+            radius: 10
+            bg_color: ${BambuHeader}
+            align: TOP_LEFT
+            border_width: 0
+            scrollbar_mode: "OFF"
+            widgets:
+              - label:
+                  align: CENTER  
+                  text_font: font_18
+                  text_color: ${BambuWhiteText}
+                  text: ${LangUtilities}
+                  bg_opa: TRANSP     
+        # Print Options Tab
+        - obj:
+            x: 551
+            y: 7
+            width: 177
+            height: 45
+            radius: 10
+            bg_color: ${BambuHeader}
+            align: TOP_LEFT
+            border_width: 0
+            scrollbar_mode: "OFF"
+            widgets:
+              - label:
+                  align: CENTER  
+                  text_font: font_18
+                  text_color: ${BambuWhiteText}
+                  text: ${LangPrintOptions}
+                  bg_opa: TRANSP                           
+        # Border
+        - obj:
+            x: 85
+            y: 52
+            width: 715
+            height: 428 #388
+            radius: 0
+            bg_color: ${BambuBorder}
+            align: TOP_LEFT
+            border_width: 0
+            scrollbar_mode: "OFF"
+        - obj:
+            x: 95
+            y: 62
+            width: 695
+            height: 408 #368
+            radius: 10
+            bg_color: ${BambuHeader}
+            align: TOP_LEFT
+            border_width: 0
+            scrollbar_mode: "OFF"
+        # Info panel
+        - obj:
+            x: 95
+            y: 62
+            width: 205
+            height: 408
+            radius: 10
+            bg_color: ${BambuInfo}
+            align: TOP_LEFT
+            border_width: 0
+            scrollbar_mode: "OFF"
+            pad_all: 0
+            widgets:
+            # Nozzle
+              - obj:
+                  id: MenuControl1Nozzle
+                  x: 0
+                  y: 6
+                  width: 195
+                  height: 60
+                  radius: 10
+                  bg_color: ${BambuInfo}
+                  align: TOP_LEFT
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  scrollable: FALSE
+                  pad_all: 0
+                  on_click:
+                    - script.execute: show_kybd_nozzle_temp
+                  widgets:
+                    - image:
+                        src: ImageNavNozzleTemp
+                        x: 0
+                        y: 10
+                        id: ButtonControl1NozzleTemp
+                    - label:
+                        x: 40
+                        y: 6
+                        text: "0"
+                        text_font: font_48
+                        text_color: ${BambuWhiteText}
+                        id: LabelControl1NozzleTemp
+                    - label: 
+                        x: 122
+                        y: 18
+                        text: "/"
+                        text_font: font_24
+                        text_color: ${BambuGreyText}
+                        bg_opa: TRANSP
+                        border_width: 0
+                        scrollbar_mode: "OFF"
+                    - label: 
+                        x: 140
+                        y: 18
+                        text: "0"
+                        text_font: font_24
+                        text_color: ${BambuGreyText}
+                        bg_opa: TRANSP
+                        border_width: 0
+                        scrollbar_mode: "OFF"
+                        id: LabelControl1NozzleTarget
+
+
+              # Bed 
+              - obj:
+                  id: MenuControl1Bed
+                  x: 0
+                  y: 81
+                  width: 195
+                  height: 60
+                  radius: 10
+                  bg_color: ${BambuInfo}
+                  align: TOP_LEFT
+                  border_width: 1
+                  pad_all: 0
+                  widgets:            
+                    - image:
+                        src: ImageNavBedTemp
+                        x: 0
+                        y: 10
+                        id: ButtonControl1BedTemp
+                    - label:
+                        x: 40
+                        y: 6
+                        text: "0"
+                        text_font: font_48
+                        text_color: ${BambuWhiteText}
+                        id: LabelControl1BedTemp
+                    - label:
+                        x: 122
+                        y: 18
+                        text: "/ 0"
+                        text_font: font_24
+                        text_color: ${BambuGreyText}
+                        id: LabelControl1BedTarget  
+              # Enclosure
+              - obj:
+                  x: 0
+                  y: 152
+                  width: 195
+                  height: 60
+                  radius: 10
+                  bg_color: ${BambuInfo}
+                  align: TOP_LEFT
+                  border_width: 1
+                  scrollbar_mode: "OFF"
+                  pad_all: 0
+                  widgets:
+                    - image:
+                        x: 0
+                        y: 10 
+                        src: ImageNavEncTemp
+                        id: ButtonControl1EncTemp
+                        hidden: ${PrinterEncTempHidden}
+                    - label:
+                        x: 40
+                        y: 18
+                        text_font: font_24
+                        text_color: ${BambuWhiteText}
+                        text: ${LangOff}
+                        id: LabelControl1EncTemp
+                        hidden: ${PrinterEncTempHidden}
+                    - label:
+                        x: 122
+                        y: 18
+                        text_font: font_24
+                        text_color: ${BambuWhiteText}
+                        text: ${LangOff}
+                        id: LabelControl1EncRH
+                        hidden: ${PrinterEncRHHidden}
+              # Speed
+              - obj:
+                  id: MenuControl1Speed
+                  x: 0
+                  y: 225
+                  width: 195
+                  height: 60
+                  radius: 10
+                  bg_color: ${BambuInfo}
+                  align: TOP_LEFT
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  pad_all: 0
+                  widgets:
+                    - image:
+                        x: 0
+                        y: 10 
+                        src: ImageNavSpeed
+                        id: ButtonControl1Speed
+                    - label:
+                        x: 40
+                        y: 18
+                        text_font: font_24
+                        text_color: ${BambuWhiteText}
+                        text: ${LangOff}
+                        id: LabelControl1Speed
+                  on_click:
+                    then:
+                      - script.execute: open_PopUpSpeed
+              # Parent fan container
+              - obj:
+                  id: MenuControl1Fan
+                  x: 0
+                  y: 296
+                  width: 195
+                  height: 110
+                  radius: 10
+                  bg_color: ${BambuInfo}
+                  align: TOP_LEFT
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  pad_all: 0
+                  widgets:
+              # part Fan container
+                    - obj:
+                        x: 0
+                        y: 5
+                        width: 60             
+                        height: 100 
+                        radius: 0
+                        bg_opa: TRANSP
+                        align: TOP_LEFT
+                        border_width: 0
+                        scrollbar_mode: "OFF"
+                        pad_all: 0
+                        widgets:
+                          - label:
+                              y: 1
+                              text_font: font_14
+                              text_color: ${BambuWhiteText}
+                              text: ${LangFanCooling}
+                              align: TOP_MID
+                          - image:
+                              y: 25 
+                              src: ImageNavFanOff
+                              id: ButtonControl1FanCooling
+                              align: TOP_MID
+                          - label:
+                              y: 70
+                              text_font: font_18
+                              text_color: ${BambuWhiteText}
+                              text: "0%"
+                              id: LabelControl1Cooling
+                              align: TOP_MID
+                        on_click:
+                          then:
+                            - script.execute: show_PopUpFan                              
+                    # Aux Fan Container
+                    - obj:
+                        x: 65
+                        y: 5
+                        width: 60 #195/3            
+                        height: 100 
+                        radius: 0
+                        bg_opa: TRANSP
+                        align: TOP_LEFT
+                        border_width: 0
+                        scrollbar_mode: "OFF"
+                        pad_all: 0
+                        widgets:
+                          - label:
+                              y: 1
+                              text_font: font_14
+                              text_color: ${BambuWhiteText}
+                              text: ${LangFanAux}
+                              align: TOP_MID
+                          - image:
+                              y: 25 
+                              src: ImageNavFanOff
+                              id: ButtonControl1FanAux
+                              align: TOP_MID
+                          - label:
+                              y: 70
+                              text_font: font_18
+                              text_color: ${BambuWhiteText}
+                              text: "0%"
+                              id: LabelControl1Aux
+                              align: TOP_MID
+                        on_click:
+                          then:
+                            - script.execute: show_PopUpFan  
+                    # Chamber Fan Container
+                    - obj:
+                        x: 130
+                        y: 5
+                        width: 60 #195/3            
+                        height: 100 
+                        radius: 0
+                        bg_opa: TRANSP
+                        align: TOP_LEFT
+                        border_width: 0
+                        scrollbar_mode: "OFF"
+                        pad_all: 0
+                        widgets:
+                          - label:
+                              y: 1
+                              text_font: font_14
+                              text_color: ${BambuWhiteText}
+                              text: ${LangFanEnc}
+                              align: TOP_MID
+                          - image:
+                              y: 25 
+                              src: ImageNavFanOff
+                              id: ButtonControl1FanEnc
+                              align: TOP_MID
+                          - label:
+                              y: 70
+                              text_font: font_18
+                              text_color: ${BambuWhiteText}
+                              text: "0%"
+                              id: LabelControl1Enc
+                              align: TOP_MID
+                        on_click:
+                          then:
+                            - script.execute: show_PopUpFan  
+        # Main Panel Covers right side rounded corners of above
+        - obj:
+            x: 290
+            y: 62
+            width: 500
+            height: 408
+            radius: 0
+            bg_color: ${BambuHeader}
+            align: TOP_LEFT
+            border_width: 0
+            scrollbar_mode: "OFF"
+            pad_all: 0
+            widgets:
+              # Speed slider pop up panel
+              - obj:
+                  id: PopUpSpeed
+                  x: 100
+                  y: 30
+                  width: 300
+                  height: 358
+                  radius: 10
+                  bg_color: ${BambuInfo}
+                  align: TOP_LEFT
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  pad_all: 0
+                  hidden: TRUE
+                  widgets:
+                    - label:
+                        x: 20
+                        y: 10
+                        text_font: font_24
+                        text_color: ${BambuWhiteText}
+                        text: ${LangSpeedHeading}                    
+                    - slider:
+                        x: 80
+                        y: 100
+                        width: 3
+                        height: 210
+                        id: slider_id
+                        value: 0
+                        min_value: 0
+                        max_value: 3
+                        bg_color: ${BambuHeader}
+                        bg_opa: 100%
+                        indicator:
+                          bg_opa: transp
+                        knob:
+                          bg_color: ${BambuGreen}
+                          pad_all: 10
+                    - label:
+                        x: 130
+                        y: 85
+                        text_font: font_24
+                        text_color: ${BambuWhiteText}
+                        text: ${LangSpeedLudicrous}
+                    - label:
+                        x: 130
+                        y: 155
+                        text_font: font_24
+                        text_color: ${BambuWhiteText}
+                        text: ${LangSpeedSport}
+                    - label:
+                        x: 130
+                        y: 225
+                        text_font: font_24
+                        text_color: ${BambuWhiteText}
+                        text: ${LangSpeedStandard}
+                    - label:
+                        x: 130
+                        y: 295
+                        text_font: font_24
+                        text_color: ${BambuWhiteText}
+                        text: ${LangSpeedSilent}
+                    - button:
+                        x: 240
+                        y: 320
+                        width: 50
+                        height: 30
+                        id: btn_id
+                        shadow_width: 0
+                        bg_color: ${BambuHeader}
+                        border_width: 0
+                        border_color: ${BambuWhiteText}
+                        widgets:
+                          - label:
+                              align: center
+                              text: "OK"
+                        on_click:
+                          then:
+                            - script.execute: close_PopUpSpeed
+              # Fan pop up panel
+              - obj:
+                  id: PopUpFan
+                  x: 4
+                  y: 4
+                  width: 492
+                  height: 400
+                  radius: 10
+                  bg_color: ${BambuInfo}
+                  align: TOP_LEFT
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  pad_all: 0
+                  hidden: TRUE
+                  widgets:
+                    ## Part Fan Control
+                    - label:
+                        x: -164
+                        y: 60
+                        text_font: font_18
+                        text_color: ${BambuWhiteText}
+                        text: ${LangFanCooling}
+                        align: TOP_MID
+                    - image:
+                        x: -164
+                        y: 12 
+                        src: ImageNavFanOff
+                        id: ButtonControl1FanPartCont
+                        align: TOP_MID
+                    - meter:
+                        height: 135
+                        width: 135
+                        align: TOP_MID
+                        x: -164
+                        y: 85
+                        bg_color: ${BambuInfo}
+                        border_width: 0
+                        scales:
+                          range_from: 0
+                          range_to: 100
+
+                          ticks:
+                            count: 11
+                            length: 10
+                            #major:
+                            #  stride: 2
+                            #  length: 13
+                            #  label_gap: 13
+                          indicators:
+                            - arc:
+                                color: ${BambuWhiteText}
+                                width: 2
+                                start_value: 0
+                                end_value: 100
+                                r_mod: 10
+                            - line:
+                                id: NeedleTempPart
+                                width: 2
+                                color: 0xFF0000
+                                r_mod: -2
+                    - label:
+                        x: -164
+                        y: 190
+                        text_font: font_24
+                        text_color: ${BambuWhiteText}
+                        text: "0%"
+                        id: LabelControl1FanPartCont
+                        align: TOP_MID
+                    - obj:
+                        x: -164
+                        y: 250
+                        width: 135
+                        height: 50
+                        bg_opa: TRANSP
+                        border_width: 1
+                        border_color: ${BambuGreyText}
+                        align: TOP_MID
+                        pad_all: 0
+                        scrollable: FALSE
+                        widgets:
+                          - obj:
+                              x: 0
+                              y: 0
+                              width: 65
+                              height: 50
+                              bg_opa: TRANSP
+                              border_width: 0
+                              align: TOP_LEFT
+                              scrollable: FALSE
+                              on_click:
+                                then:
+                                  - homeassistant.action:
+                                      action: fan.decrease_speed
+                                      data:
+                                        entity_id: ${PrinterFanCoolingControl}
+                                        percentage_step: '10'
+                              widgets:
+                                # Part fan minus button
+                                - label:
+                                    align: CENTER
+                                    text_font: font_48
+                                    text_color: ${BambuGreyText}
+                                    text: "-"
+                          - obj:
+                              x: 0
+                              y: 0
+                              width: 65
+                              height: 50
+                              bg_opa: TRANSP
+                              border_width: 0
+                              align: TOP_RIGHT
+                              scrollable: FALSE
+                              on_click:
+                                then:
+                                  - homeassistant.action:
+                                      action: fan.increase_speed
+                                      data:
+                                        entity_id: ${PrinterFanCoolingControl}
+                                        percentage_step: '10'
+                              widgets:
+                                # Part fan plus button
+                                - label:
+                                    align: CENTER
+                                    text_font: font_48
+                                    text_color: ${BambuGreyText}
+                                    text: "+"                              
+                          - line:
+                              points:
+                                - 0, 3
+                                - 0, 45
+                              line_width: 2
+                              line_color: ${BambuGreyText}
+                              align: TOP_MID
+                    - switch:
+                        x: -164
+                        y: 320
+                        id: SwitchControl1FanPart
+                        bg_color: ${BambuGreyText}
+                        align: TOP_MID
+                        indicator:
+                          checked:
+                            bg_color: ${BambuGreen}                        
+                        on_click:
+                          then:
+                            - homeassistant.action:
+                                action: fan.toggle
+                                data:
+                                  entity_id: ${PrinterFanCoolingControl}   
+                    ## Aux Fan Control
+                    - label:
+                        x: 0
+                        y: 60
+                        text_font: font_18
+                        text_color: ${BambuWhiteText}
+                        text: ${LangFanAux}
+                        align: TOP_MID
+                    - image:
+                        x: 0
+                        y: 12 
+                        src: ImageNavFanOff
+                        id: ButtonControl1FanAuxCont
+                        align: TOP_MID
+                    - meter:
+                        height: 135
+                        width: 135
+                        align: TOP_MID
+                        x: 0
+                        y: 85
+                        bg_color: ${BambuInfo}
+                        border_width: 0
+                        scales:
+                          range_from: 0
+                          range_to: 100
+                          ticks:
+                            count: 11
+                            length: 10
+                          indicators:
+                            - arc:
+                                color: ${BambuWhiteText}
+                                width: 2
+                                start_value: 0
+                                end_value: 100
+                                r_mod: 10
+                            - line:
+                                id: NeedleTempAux
+                                width: 2
+                                color: 0xFF0000
+                                r_mod: -2
+                    - label:
+                        x: 0
+                        y: 190
+                        text_font: font_24
+                        text_color: ${BambuWhiteText}
+                        text: "0%"
+                        id: LabelControl1FanAuxCont
+                        align: TOP_MID
+                    - obj:
+                        x: 0
+                        y: 250
+                        width: 135
+                        height: 50
+                        bg_opa: TRANSP
+                        border_width: 1
+                        border_color: ${BambuGreyText}
+                        align: TOP_MID
+                        pad_all: 0
+                        scrollable: FALSE
+                        widgets:
+                          - obj:
+                              x: 0
+                              y: 0
+                              width: 65
+                              height: 50
+                              bg_opa: TRANSP
+                              border_width: 0
+                              align: TOP_LEFT
+                              scrollable: FALSE
+                              on_click:
+                                then:
+                                  - homeassistant.action:
+                                      action: fan.decrease_speed
+                                      data:
+                                        entity_id: ${PrinterFanAuxControl}
+                                        percentage_step: '10'
+                              widgets:
+                                - label:
+                                    align: CENTER
+                                    text_font: font_48
+                                    text_color: ${BambuGreyText}
+                                    text: "-"
+                          - obj:
+                              x: 0
+                              y: 0
+                              width: 65
+                              height: 50
+                              bg_opa: TRANSP
+                              border_width: 0
+                              align: TOP_RIGHT
+                              scrollable: FALSE
+                              on_click:
+                                then:
+                                  - homeassistant.action:
+                                      action: fan.increase_speed
+                                      data:
+                                        entity_id: ${PrinterFanAuxControl}
+                                        percentage_step: '10'
+                              widgets:
+                                - label:
+                                    align: CENTER
+                                    text_font: font_48
+                                    text_color: ${BambuGreyText}
+                                    text: "+"                              
+                          - line:
+                              points:
+                                - 0, 3
+                                - 0, 45
+                              line_width: 2
+                              line_color: ${BambuGreyText}
+                              align: TOP_MID
+                    - switch:
+                        x: 0
+                        y: 320
+                        id: SwitchControl1FanAux
+                        bg_color: ${BambuGreyText}
+                        align: TOP_MID
+                        indicator:
+                          checked:
+                            bg_color: ${BambuGreen}
+                        on_click:
+                          then:
+                            - homeassistant.action:
+                                action: fan.toggle
+                                data:
+                                  entity_id: ${PrinterFanAuxControl}                     
+                    ## Chamber fan conrol
+                    - label:
+                        x: 164
+                        y: 60
+                        text_font: font_18
+                        text_color: ${BambuWhiteText}
+                        text: ${LangFanEnc}
+                        align: TOP_MID
+                    - image:
+                        x: 164
+                        y: 12 
+                        src: ImageNavFanOff
+                        id: ButtonControl1FanEncCont
+                        align: TOP_MID
+                    - meter:
+                        height: 135
+                        width: 135
+                        align: TOP_MID
+                        x: 164
+                        y: 85
+                        bg_color: ${BambuInfo}
+                        border_width: 0
+                        scales:
+                          range_from: 0
+                          range_to: 100
+                          ticks:
+                            count: 11
+                            length: 10
+                          indicators:
+                            - arc:
+                                color: ${BambuWhiteText}
+                                width: 2
+                                start_value: 0
+                                end_value: 100
+                                r_mod: 10
+                            - line:
+                                id: NeedleTempEnc
+                                width: 2
+                                color: 0xFF0000
+                                r_mod: -2
+                    - label:
+                        x: 164
+                        y: 190
+                        text_font: font_24
+                        text_color: ${BambuWhiteText}
+                        text: "0%"
+                        id: LabelControl1FanEncCont
+                        align: TOP_MID
+                    - obj:
+                        x: 164
+                        y: 250
+                        width: 135
+                        height: 50
+                        bg_opa: TRANSP
+                        border_width: 1
+                        border_color: ${BambuGreyText}
+                        align: TOP_MID
+                        pad_all: 0
+                        scrollable: FALSE
+                        widgets:
+                          - obj:
+                              x: 0
+                              y: 0
+                              width: 65
+                              height: 50
+                              bg_opa: TRANSP
+                              border_width: 0
+                              align: TOP_LEFT
+                              scrollable: FALSE
+                              on_click:
+                                then:
+                                  - homeassistant.action:
+                                      action: fan.decrease_speed
+                                      data:
+                                        entity_id: ${PrinterFanEnclosureControl}
+                                        percentage_step: '10'
+                              widgets:
+                                - label:
+                                    align: CENTER
+                                    text_font: font_48
+                                    text_color: ${BambuGreyText}
+                                    text: "-"
+                          - obj:
+                              x: 0
+                              y: 0
+                              width: 65
+                              height: 50
+                              bg_opa: TRANSP
+                              border_width: 0
+                              align: TOP_RIGHT
+                              scrollable: FALSE
+                              on_click:
+                                then:
+                                  - homeassistant.action:
+                                      action: fan.increase_speed
+                                      data:
+                                        entity_id: ${PrinterFanEnclosureControl}
+                                        percentage_step: '10'
+                              widgets:
+                                - label:
+                                    align: CENTER
+                                    text_font: font_48
+                                    text_color: ${BambuGreyText}
+                                    text: "+"                              
+                          - line:
+                              points:
+                                - 0, 3
+                                - 0, 45
+                              line_width: 2
+                              line_color: ${BambuGreyText}
+                              align: TOP_MID
+                    - switch:
+                        x: 164
+                        y: 320
+                        id: SwitchControl1FanEnc
+                        bg_color: ${BambuGreyText}
+                        align: TOP_MID
+                        indicator:
+                          checked:
+                            bg_color: ${BambuGreen}
+                        on_click:
+                          then:
+                            - homeassistant.action:
+                                action: fan.toggle
+                                data:
+                                  entity_id: ${PrinterFanEnclosureControl}   
+                    - button:
+                        x: 430
+                        y: 360
+                        width: 50
+                        height: 30
+                        shadow_width: 0
+                        bg_color: ${BambuHeader}
+                        border_width: 0
+                        border_color: ${BambuWhiteText}
+                        widgets:
+                          - label:
+                              align: center
+                              text: "OK"
+                        on_click:
+                            - script.execute: close_PopUpFan
+
+              # Nozzle Target Temp Keyboard
+              - obj:
+                  id: PopUpNozzleTarget
+                  x: 4
+                  y: 4
+                  width: 492
+                  height: 400
+                  radius: 10
+                  bg_color: ${BambuInfo}
+                  align: TOP_LEFT
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  pad_all: 0
+                  hidden: TRUE
+                  widgets:
+                    - buttonmatrix:
+                        id: KeypadNozzle
+                        #x: 20
+                        #y: 85
+                        align: CENTER
+                        width: 350
+                        height: 350
+                        bg_color: ${BambuInfo}
+                        border_width: 0
+                        items:
+                          bg_color: ${BambuHeader}
+                          text_color: ${BambuWhiteText}
+                          pressed:
+                            bg_color: ${BambuGreen}
+                        rows:
+                          - buttons:
+                              - text: 1
+                                control:
+                                  no_repeat: true
+                              - text: 2
+                                control:
+                                  no_repeat: true
+                              - text: 3
+                                control:
+                                  no_repeat: true
+                          - buttons:
+                              - text: 4
+                                control:
+                                  no_repeat: true
+                              - text: 5
+                                control:
+                                  no_repeat: true
+                              - text: 6
+                                control:
+                                  no_repeat: true
+                          - buttons:
+                              - text: 7
+                                control:
+                                  no_repeat: true
+                              - text: 8
+                                control:
+                                  no_repeat: true
+                              - text: 9
+                                control:
+                                  no_repeat: true
+                          - buttons:
+                              - text: "\uF55A"
+                                key_code: "*"
+                                control:
+                                  no_repeat: true
+                              - text: 0
+                                control:
+                                  no_repeat: true
+                              - text: "\uF00C"
+                                key_code: "#"
+                                control:
+                                  no_repeat: true
+                          - buttons:
+                              - text: ${LangCancel}
+                                key_code: "C"
+                                control:
+                                  no_repeat: true
+                                on_click:
+                                  then:
+                                    - script.execute: close_kybd_nozzle_temp
+
+
+
+          
+  
+
+  style_definitions:
+    - id: date_style      # choose an ID for your definition
+      text_font: unscii_8
+      align: center
+      text_color: 0xFFFFFF
+      bg_color: 0x000000
+      bg_opa: cover
+      radius: 4
+      pad_all: 2
+    - id: default_cyan
+      bg_color: 0x000000
+      text_color: 0x00FFFF
+    - id: side_bar
+      bg_color: ${BackGroundColor}
+      #bg_grad_color: 0x005782
+      #bg_grad_dir: VER
+      bg_opa: COVER
+      border_opa: TRANSP
+      radius: 0
+      pad_all: 0
+      pad_row: 0
+      pad_column: 0
+      border_color: ${BackGroundColor}
+      border_width: 0
+      #text_color: 0xFFFFFF
+      #width: 10%
+      #height: 100%
+
+binary_sensor:
+  - platform: homeassistant
+    id: printer_light
+    entity_id: ${PrinterLight}
+    trigger_on_initial_state: true
+    on_state:
+      then:
+        - if:
+            condition:
+              lambda: return id(printer_light).state == 1;
+            then:
+              - lvgl.image.update:
+                  id: ButtonLampToggle
+                  src: ImageLampOn
+            else:
+              - lvgl.image.update:
+                  id: ButtonLampToggle
+                  src: ImageLampOff
+
+  
+
+
+time:
+  - platform: homeassistant
+    id: time_comp
+
+
+number:
+  # Dummy echo of speed slider
+  - platform: lvgl
+    id: slider_id_number
+    widget: slider_id
+    name: LVGL Slider
+    update_on_release: true
+
+  # Printer WiFi Signal
+  - platform: homeassistant
+    id: printer_wifi
+    entity_id: ${PrinterWiFi}
+    #publish_initial_state: true
+    on_value_range: 
+      - above: -1
+        then:
+          - lvgl.image.update:
+              id: ButtonWiFi
+              src: ImageNavWiFiNone
+      - below: -1.0
+        above: -60.0
+        then:
+          - lvgl.image.update:
+              id: ButtonWiFi
+              src: ImageNavWiFiStrong
+      - below: -60.0
+        above: -70.0
+        then:
+          - lvgl.image.update:
+              id: ButtonWiFi
+              src: ImageNavWiFiMiddle
+      - below: -70.0
+        above: -80.0
+        then:
+          - lvgl.image.update:
+              id: ButtonWiFi
+              src: ImageNavWiFiWeak
+      - below: -80.0
+        then:
+          - lvgl.image.update:
+              id: ButtonWiFi
+              src: ImageNavWiFiNone 
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: LabelWiFi
+            text:
+              format: "%.0fdBm"
+              args: [ 'x' ] 
+# Printer Temperature sensors
+  - platform: homeassistant
+    id: printer_nozzle_temp
+    entity_id: ${PrinterNozzleTemp}
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: LabelNozzleTemp
+            text:
+              format: "%.0f°C"
+              args: [ 'x' ] 
+        - lvgl.label.update:
+            id: LabelControl1NozzleTemp
+            text:
+              format: "%.0f"
+              args: [ 'x' ]              
+
+  - platform: homeassistant
+    id: printer_nozzle_target_temp
+    entity_id: ${PrinterNozzleTargetTemp}
+    on_value:
+      then:
+        - script.execute: update_printer_nozzle_target_temp
+
+  - platform: homeassistant
+    id: printer_bed_temp
+    entity_id: ${PrinterBedTemp}
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: LabelBedTemp
+            text:
+              format: "%.0f°C"
+              args: [ 'x' ]
+        - lvgl.label.update:
+            id: LabelControl1BedTemp
+            text:
+              format: "%.0f"
+              args: [ 'x' ]              
+
+
+  - platform: homeassistant
+    id: printer_bed_target_temp
+    entity_id: ${PrinterBedTargetTemp}
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(printer_bed_target_temp).state == 0;'
+            then:
+              - lvgl.image.update:
+                  id: ButtonBedTemp
+                  src: ImageNavBedTemp
+              - lvgl.image.update: 
+                  id: ButtonControl1BedTemp
+                  src: ImageNavBedTemp 
+            else:
+              - lvgl.image.update:
+                  id: ButtonBedTemp
+                  src: ImageNavBedTempActive
+              - lvgl.image.update: 
+                  id: ButtonControl1BedTemp
+                  src: ImageNavBedTempActive
+              - lvgl.label.update:
+                  id: LabelControl1BedTarget
+                  text:
+                    format: "/ %.0f"
+                    args: [ 'x' ] 
+# Print Progress 
+  - platform: homeassistant
+    id: printer_job_progress
+    entity_id: ${PrinterPrintProgress}
+    on_value:
+      then:
+        - lvgl.bar.update:
+            id: BarPrintProgress
+            value: !lambda return x;
+
+        - lvgl.label.update:
+            id: LabelPrintProgress
+            text:
+              format: "%.0f%%"
+              args: [ 'x' ] 
+
+
+
+ # Fan sensors
+  - platform: homeassistant
+    id: printer_fan_enclosure
+    entity_id: ${PrinterFanEnclosure}
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: LabelControl1Enc
+            text:
+              format: "%.0f%%"
+              args: [ 'x' ]
+        - lvgl.label.update:
+            id: LabelControl1FanEncCont
+            text:
+              format: "%.0f%%"
+              args: [ 'x' ]
+        - lvgl.indicator.update:
+            id: NeedleTempEnc
+            value: !lambda return x;
+        - if:
+            condition:
+              lambda: 'return id(printer_fan_enclosure).state == 0;'
+            then:
+              - lvgl.image.update:
+                  id: ButtonControl1FanEnc
+                  src: ImageNavFanOff
+              - lvgl.image.update:
+                  id: ButtonControl1FanEncCont
+                  src: ImageNavFanOff
+                  #SwitchControl1FanEnc
+              - lvgl.widget.update:
+                  id: SwitchControl1FanEnc
+                  state:
+                    checked: FALSE
+            else:
+              - lvgl.image.update:
+                  id: ButtonControl1FanEnc
+                  src: ImageNavFanOn
+              - lvgl.image.update:
+                  id: ButtonControl1FanEncCont
+                  src: ImageNavFanOn
+              - lvgl.widget.update:
+                  id: SwitchControl1FanEnc
+                  state:
+                    checked: TRUE
+
+  - platform: homeassistant
+    id: printer_fan_cooling
+    entity_id: ${PrinterFanCooling}
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: LabelControl1Cooling
+            text:
+              format: "%.0f%%"
+              args: [ 'x' ]
+        - lvgl.label.update:
+            id: LabelControl1FanPartCont
+            text:
+              format: "%.0f%%"
+              args: [ 'x' ]
+        - lvgl.indicator.update:
+            id: NeedleTempPart
+            value: !lambda return x;
+        - if:
+            condition:
+              lambda: 'return id(printer_fan_cooling).state == 0;'
+            then:
+              - lvgl.image.update:
+                  id: ButtonControl1FanCooling
+                  src: ImageNavFanOff
+              - lvgl.image.update:
+                  id: ButtonControl1FanPartCont
+                  src: ImageNavFanOff
+              - lvgl.widget.update:
+                  id: SwitchControl1FanPart
+                  state:
+                    checked: FALSE
+            else:
+              - lvgl.image.update:
+                  id: ButtonControl1FanCooling
+                  src: ImageNavFanOn 
+              - lvgl.image.update:
+                  id: ButtonControl1FanPartCont
+                  src: ImageNavFanOn 
+              - lvgl.widget.update:
+                  id: SwitchControl1FanPart
+                  state:
+                    checked: TRUE
+
+  - platform: homeassistant
+    id: printer_fan_aux
+    entity_id: ${PrinterFanAux}
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: LabelControl1Aux
+            text:
+              format: "%.0f%%"
+              args: [ 'x' ]
+        - lvgl.label.update:
+            id: LabelControl1FanAuxCont
+            text:
+              format: "%.0f%%"
+              args: [ 'x' ]
+        - lvgl.indicator.update:
+            id: NeedleTempAux
+            value: !lambda return x;
+        - if:
+            condition:
+              lambda: 'return id(printer_fan_aux).state == 0;'
+            then:
+              - lvgl.image.update:
+                  id: ButtonControl1FanAux
+                  src: ImageNavFanOff
+              - lvgl.image.update:
+                  id: ButtonControl1FanAuxCont
+                  src: ImageNavFanOff
+              - lvgl.widget.update:
+                  id: SwitchControl1FanAux
+                  state:
+                    checked: FALSE
+            else:
+              - lvgl.image.update:
+                  id: ButtonControl1FanAux
+                  src: ImageNavFanOn              
+              - lvgl.image.update:
+                  id: ButtonControl1FanAuxCont
+                  src: ImageNavFanOn
+              - lvgl.widget.update:
+                  id: SwitchControl1FanAux
+                  state:
+                    checked: TRUE
+
+text_sensor:
+# Printer Status
+  - platform: homeassistant
+    id: printer_status
+    entity_id: ${PrinterStatus}
+    on_value: 
+      then:
+#        - lvgl.label.update:
+#            id: LabelPrinterStatus
+#            text:
+#              format: "%s"
+#              args: [ 'id(printer_status).state.c_str()' ]
+        - if:
+            condition:
+              lambda: 'return id(printer_status).state == "offline";'
+            then:
+              - script.execute: offline_script
+
+        - if:
+            condition:
+              lambda: 'return id(printer_status).state == "idle";'
+            then:
+              - script.execute: idle_script
+
+        - if:
+            condition:
+              lambda: 'return id(printer_status).state == "running";'
+            then:
+              - script.execute: running_script
+
+        - if:
+            condition:
+              lambda: 'return id(printer_status).state == "finish";'
+            then:
+              - script.execute: finish_script
+# PrinterCurrentStage
+  - platform: homeassistant
+    id: printer_current_stage
+    entity_id: ${PrinterCurrentStage}
+    on_value: 
+      then:
+        - lvgl.label.update:
+            id: LabelPrinterStatus
+            text:
+              format: "%s"
+              args: [ 'id(printer_current_stage).state.c_str()' ]
+
+# Printer Name
+  - platform: homeassistant
+    id: printer_name
+    entity_id: ${PrinterName}
+    on_value: 
+      then:
+        - lvgl.label.update:
+            id: LabelPrinterName
+            text:
+              format: "%s"
+              args: [ 'id(printer_name).state.c_str()' ]
+# Printer Name
+  - platform: homeassistant
+    id: printer_IP
+    entity_id: ${PrinterIP} 
+    on_value: 
+      then:
+        - lvgl.label.update:
+            id: LabelPrinterIP
+            text:
+              format: "%s"
+              args: [ 'id(printer_IP).state.c_str()' ]
+# Task Name  LangPrintTaskName   
+  - platform: homeassistant
+    id: print_task_name
+    entity_id: ${PrinterTaskName} 
+    on_value: 
+      then:
+        - lvgl.label.update:
+            id: LabelPrintTaskName
+            text:
+              format: "%s"
+              args: [ 'id(print_task_name).state.c_str()' ]
+# Print Estimated Finish LabelPrintEndTime 
+  - platform: homeassistant
+    id: print_task_end_time
+    entity_id: ${PrinterPrintEndTime} 
+    on_value: 
+      then:
+        - lvgl.label.update:
+            id: LabelPrintEndTime
+            text:
+              format: "%s"
+              args: [ 'id(print_task_end_time).state.c_str()' ]
+# Print Speed options are silent, standard, sport, ludicrous
+  - platform: homeassistant
+    id: printer_speed_profile
+    entity_id: ${PrinterSpeedProfile} 
+    on_value: 
+      then:
+        - lvgl.label.update:
+            id: LabelControl1Speed
+            text:
+              format: "%s"
+              args: [ 'id(printer_speed_profile).state.c_str()' ]
+        - if:
+            condition:
+              lambda: 'return id(printer_speed_profile).state == "silent";'
+            then:
+              - lvgl.slider.update:
+                  id: slider_id
+                  value: 0
+        - if:
+            condition:
+              lambda: 'return id(printer_speed_profile).state == "standard";'
+            then:
+              - lvgl.slider.update:
+                  id: slider_id
+                  value: 1
+        - if:
+            condition:
+              lambda: 'return id(printer_speed_profile).state == "sport";'
+            then:
+              - lvgl.slider.update:
+                  id: slider_id
+                  value: 2
+        - if:
+            condition:
+              lambda: 'return id(printer_speed_profile).state == "ludicrous";'
+            then:
+              - lvgl.slider.update:
+                  id: slider_id
+                  value: 3
+
+  - platform: homeassistant
+    id: printer_current_layer
+    entity_id: ${PrinterCurrentLayer}
+    on_value: 
+      then:
+        - lvgl.label.update:
+            id: LabelCurrentLayer
+            text:
+              format: "${LangLayer}%s%s%s"
+              args: [ 'id(printer_current_layer).state.c_str()', '" / "',  'id(printer_total_layer).state.c_str()' ] 
+
+  - platform: homeassistant
+    id: printer_total_layer
+    entity_id: ${PrinterTotalLayer}
+
+
+button:
+  - platform: template
+    name: "ImageUpdate"
+    id: ImageUpdate
+    on_press:
+      - component.update: ImageCover
+
+#####################################
+#####   Key Collectors          #####
+#####################################
+
+key_collector:
+  # Nozzle target temp keypad collector
+  - id: KeyCollNozzle
+    source_id: KeypadNozzle
+    min_length: 2
+    max_length: 3
+    end_keys: "#"
+    end_key_required: true
+    back_keys: "*"
+    allowed_keys: "0123456789*#"
+    timeout: 5s
+    on_progress:
+      - if:
+          condition:
+            lambda: return (0 != x.compare(std::string{""}));
+          then:
+            - lvgl.label.update:
+                id: LabelControl1NozzleTarget
+                text: !lambda 'return x.c_str();'
+          else:
+            - lvgl.label.update:
+                id: LabelControl1NozzleTarget
+                text: "0"
+    on_result:
+      - logger.log:
+          format: "input result: '%s', started by '%c', ended by '%c'"
+          args: [ 'x.c_str()', "(start == 0 ? '~' : start)", "(end == 0 ? '~' : end)" ]
+      - globals.set:
+          id: TemperatureTemp
+          value: !lambda 'return x.c_str();'
+      - lvgl.widget.show: message_box_nozzle_temp
+
+#      - if:
+#          condition:
+#            lambda: return (0 == x.compare(std::string{"1234"}));
+#          then:
+#            - lvgl.led.update:
+#                id: lvgl_led
+#                color: 0x00FF00
+#          else:
+#            - lvgl.led.update:
+#                id: lvgl_led
+#                color: 0xFF0000
+
+
+#####################################
+#####        Scripts            #####        
+#####################################
+
+
+script:
+  # Disables items if offline
+  - id: offline_script
+    then:
+      - lvgl.image.update:
+              id: ButtonWiFi
+              src: ImageNavWiFiNone
+  # Runs when printer becomes idle
+  - id: idle_script
+    then:
+      - if:
+          condition:
+            lambda: 'return id(printer_wifi).state == 0.0;'
+          then:
+            - lvgl.image.update:
+                id: ButtonWiFi
+                src: ImageNavWiFiNone
+      - if:
+          condition:
+            lambda: 'return id(printer_wifi).state >= -80.0;'
+          then:
+            - lvgl.image.update:
+                id: ButtonWiFi
+                src: ImageNavWiFiWeak 
+      - if:
+          condition:
+            lambda: 'return id(printer_wifi).state >= -70.0;'
+          then:
+            - lvgl.image.update:
+                id: ButtonWiFi
+                src: ImageNavWiFiMiddle
+      - if:
+          condition:
+            lambda: 'return id(printer_wifi).state >= -60.0;'
+          then:
+            - lvgl.image.update:
+                id: ButtonWiFi
+                src: ImageNavWiFiStrong
+      - globals.set:
+          id: PrinterStateOnline
+          value: ${PrinterStateValidle}
+
+
+# Runs when print job starts
+  - id: running_script
+    then:
+      - component.update: ImageCover 
+      - lvgl.widget.show: LabelPrintTaskNameText
+      - lvgl.widget.show: LabelPrintTaskName
+      - lvgl.widget.show: LabelPrintEndTimeText
+      - lvgl.widget.show: LabelPrintEndTime
+      - lvgl.widget.show: LabelPrintProgressText
+      - lvgl.widget.show: BarPrintProgress
+      - lvgl.widget.show: LabelPrintProgress
+      - lvgl.widget.show: LabelCurrentLayer
+      - lvgl.widget.show: ImageCoverObj
+      - lvgl.image.update:
+          id: ButtonControl1Speed
+          src: ImageNavSpeed
+      - lvgl.label.update:
+          id: LabelCurrentLayer
+          text:
+            format: "${LangLayer}%s%s%s"
+            args: [ 'id(printer_current_layer).state.c_str()', '" / "',  'id(printer_total_layer).state.c_str()' ] 
+      - globals.set:
+          id: PrinterStateOnline
+          value: ${PrinterStateValrunning}
+
+# Runs when print job finish
+  - id: finish_script
+    then:
+      - lvgl.widget.hide: LabelPrintTaskNameText
+      - lvgl.widget.hide: LabelPrintTaskName
+      - lvgl.widget.hide: LabelPrintEndTimeText
+      - lvgl.widget.hide: LabelPrintEndTime
+      - lvgl.widget.hide: LabelPrintProgressText
+      - lvgl.widget.hide: BarPrintProgress
+      - lvgl.widget.hide: LabelCurrentLayer
+      - lvgl.widget.hide: LabelPrintProgress
+      - lvgl.widget.hide: ImageCoverObj
+      - lvgl.image.update:
+          id: ButtonControl1Speed
+          src: ImageNavSpeedActive
+      - globals.set:
+          id: PrinterStateOnline
+          value: ${PrinterStateValfinish}
+
+  - id: show_page_home_script
+    then:
+      - script.execute: tidy_PopUpAll
+      - lvgl.page.show: home_page
+      - lvgl.image.update:
+          id: ButtonHome
+          src: ImageNavHomeGrn
+      - lvgl.image.update:
+          id: ButtonControl
+          src: ImageNavSetGrey       
+      - lvgl.image.update:
+          id: ButtonFolder
+          src: ImageNavFolderGrey
+      - lvgl.image.update:
+          id: ButtonMaintenance
+          src: ImageNavMaintGrey
+      - lvgl.image.update:
+          id: ButtonMessages
+          src: ImageNavMessGrey
+
+  - id: show_page_control_script
+    then:
+      - script.execute: tidy_PopUpAll
+      - lvgl.page.show: control_page1
+      - lvgl.image.update:
+          id: ButtonHome
+          src: ImageNavHomeGrey
+      - lvgl.image.update:
+          id: ButtonControl
+          src: ImageNavSetGrn       
+      - lvgl.image.update:
+          id: ButtonFolder
+          src: ImageNavFolderGrey
+      - lvgl.image.update:
+          id: ButtonMaintenance
+          src: ImageNavMaintGrey
+      - lvgl.image.update:
+          id: ButtonMessages
+          src: ImageNavMessGrey
+
+  # Open speed control Pop up
+  - id: open_PopUpSpeed
+    then:
+      - script.execute: tidy_PopUpAll
+      - if:
+          condition:
+            lambda: 'return id(PrinterStateOnline) == ${PrinterStateValrunning};'
+          then:
+            - lvgl.widget.update:
+                id: MenuControl1Speed
+                bg_color: ${BambuHeader}
+            - lvgl.widget.show: PopUpSpeed
+          else:
+            - lvgl.widget.show: message_box_speed
+
+  # Close speed control Pop up
+  - id: close_PopUpSpeed
+    then:
+      - if:
+          condition:
+            lambda: 'return id(slider_id_number).state == 0;'
+          then:
+            - homeassistant.action:
+                action: select.select_option
+                data:
+                  entity_id: ${PrinterSpeedSetting}
+                  option: silent
+      - if:
+          condition:
+            lambda: 'return id(slider_id_number).state == 1;'
+          then:
+            - homeassistant.action:
+                action: select.select_option
+                data:
+                  entity_id: ${PrinterSpeedSetting}
+                  option: standard
+      - if:
+          condition:
+            lambda: 'return id(slider_id_number).state == 2;'
+          then:
+            - homeassistant.action:
+                action: select.select_option
+                data:
+                  entity_id: ${PrinterSpeedSetting}
+                  option: sport
+      - if:
+          condition:
+            lambda: 'return id(slider_id_number).state == 3;'
+          then:
+            - homeassistant.action:
+                action: select.select_option
+                data:
+                  entity_id: ${PrinterSpeedSetting}
+                  option: ludicrous
+      - script.execute: tidy_PopUpAll
+# Open Fan Pop up
+  - id: show_PopUpFan
+    then:
+      - script.execute: tidy_PopUpAll
+      - lvgl.widget.update:
+          id: MenuControl1Fan
+          bg_color: ${BambuHeader}
+      - lvgl.widget.show: PopUpFan
+
+  - id: close_PopUpFan
+    then:
+      - script.execute: tidy_PopUpAll
+
+# Nozzle target keyboard
+
+  - id: show_kybd_nozzle_temp
+    then:
+      - script.execute: tidy_PopUpAll
+      - lvgl.widget.show: PopUpNozzleTarget
+      - lvgl.widget.update:
+          id: MenuControl1Nozzle
+          bg_color: ${BambuHeader}
+  
+  - id: close_kybd_nozzle_temp
+    then:
+      - script.execute: tidy_PopUpAll
+      - script.execute: update_printer_nozzle_target_temp
+
+  - id: update_printer_nozzle_target_temp
+    then:
+      - if:
+          condition:
+            lambda: 'return id(printer_nozzle_target_temp).state == 0;'
+          then:
+            - lvgl.image.update:
+                id: ButtonNozzleTemp
+                src: ImageNavNozzleTemp
+            - lvgl.image.update: 
+                id: ButtonControl1NozzleTemp
+                src: ImageNavNozzleTemp
+            - lvgl.label.update: 
+                id: LabelControl1NozzleTarget
+                text:
+                  format: "%.0f"
+                  args: [ 'id(printer_nozzle_target_temp).state' ]
+          else:
+            - lvgl.image.update:
+                id: ButtonNozzleTemp
+                src: ImageNavNozzleTempActive
+            - lvgl.image.update:
+                id: ButtonControl1NozzleTemp
+                src: ImageNavNozzleTempActive
+            - lvgl.label.update: 
+                id: LabelControl1NozzleTarget
+                text:
+                  format: "%.0f"
+                  args: [ 'id(printer_nozzle_target_temp).state' ]
+
+  # Tidy all Pop Up screens, returns all pop ups to known state avaoiding hidden screens
+  - id: tidy_PopUpAll
+    then:
+      - lvgl.widget.update:
+          id: MenuControl1Speed
+          bg_color: ${BambuInfo}
+      - lvgl.widget.hide: PopUpSpeed
+      - lvgl.widget.update:
+          id: MenuControl1Fan
+          bg_color: ${BambuInfo}
+      - lvgl.widget.hide: PopUpFan
+      - lvgl.widget.update:
+          id: MenuControl1Nozzle
+          bg_color: ${BambuInfo}
+      - lvgl.widget.hide: PopUpNozzleTarget

@@ -1,0 +1,39 @@
+
+ 
+packages:
+  # An external package that defines the external enclosure temperature and humity customise to your needs or comment out if not needed.
+  Temperature: !include BambuPanelResources/TempHA.yaml
+  # All the main settings
+  Common: !include BambuPanelResources/common.yaml
+
+# Needed for http_request in SDL2 host
+external_components:
+  - source: github://pr#8040
+    components: [http_request]
+    refresh: 1h
+
+esphome:
+  name: bambuhost
+  friendly_name: Bambuhost
+
+logger:
+#  level: VERY_VERBOSE
+
+host:
+
+# Enable Home Assistant API
+api:
+
+
+display:
+  - platform: sdl
+    id: my_display
+    
+    dimensions:
+      width: 800
+      height: 480
+
+touchscreen:
+  platform: sdl
+  id: my_touch
+    

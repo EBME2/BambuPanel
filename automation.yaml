@@ -1,0 +1,31 @@
+alias: 3DPrinterCoverImage
+description: ""
+triggers:
+  - device_id: changeme
+    domain: bambu_lab
+    type: event_print_started
+    trigger: device
+conditions: []
+actions:
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 30
+      milliseconds: 0
+  - action: image.snapshot
+    metadata: {}
+    data:
+      filename: /config/www/media/bambuprinter/cover.png
+    target:
+      entity_id: image.p1s_changeme_cover_image
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 10
+      milliseconds: 0
+  - action: button.press
+    metadata: {}
+    data: {}
+    target:
+      entity_id: button.bambupanel_imageupdate_2
+mode: single
